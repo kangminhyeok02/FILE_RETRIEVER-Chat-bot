@@ -54,7 +54,7 @@ def main():
         st.session_state.processComplete = True
 
         if 'messages' not in st.session_state:
-        st.session_state['messages'] = [{"role": "assistant", 
+            st.session_state['messages'] = [{"role": "assistant", 
                                         "content": "안녕하세요! 주어진 문서에 대해 궁금하신 것이 있으면 언제든 물어봐주세요!"}]
 
     for message in st.session_state.messages:
