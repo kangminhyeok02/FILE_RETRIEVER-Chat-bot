@@ -9,7 +9,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import PyPDFLoader
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import UnstructuredPowerPointLoader
-from langchain_community.document_loaders import TextLoader 
+from langchain_document_loaders import TextLoader 
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -114,7 +114,6 @@ def get_text(docs):
         elif '.pptx' in doc.name:
             loader = UnstructuredPowerPointLoader(file_name)
             documents = loader.load_and_split()
-
          elif '.txt' in doc.name:
             loader = TextLoader(file_name)
             documents = loader.load_and_split()
