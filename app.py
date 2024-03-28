@@ -114,7 +114,7 @@ def get_text(docs):
         elif '.pptx' in doc.name:
             loader = UnstructuredPowerPointLoader(file_name)
             documents = loader.load_and_split()
-         elif '.txt' in doc.name:
+        elif '.txt' in doc.name:
             loader = TextLoader(file_name)
             documents = loader.load_and_split()
         
