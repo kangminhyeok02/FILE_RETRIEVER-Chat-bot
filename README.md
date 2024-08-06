@@ -1,6 +1,5 @@
 # FILE_RETRIEVER-Chat-bot
 
-# KU Library
 <img src="https://github.com/user-attachments/assets/f4c57ce0-4f03-4ffe-9896-1cde489ccc58" alt="image" width="500"/>
 
 
