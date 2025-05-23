@@ -7,7 +7,7 @@ from langchain.chat_models import ChatOpenAI
 
 from langchain.document_loaders import (
     PyPDFLoader,
-    Docx2txtLoader,
+    UnstructuredWordDocumentLoader,
     UnstructuredPowerPointLoader,
     TextLoader,
 )
@@ -15,32 +15,29 @@ from langchain.document_loaders import (
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
 
-from langchain.memory import ConversationBufferMemory  # StreamlitChatMessageHistory는 사용되지 않으므로 제거
+from langchain.memory import ConversationBufferMemory
 from langchain.vectorstores import FAISS
 
-from langchain.callbacks import get_openai_callback  # 필요 없으면 삭제 가능
+# (필요하다면) from langchain.callbacks import get_openai_callback
 
-# 설정 로깅
+# 로깅 설정
 logging.basicConfig(level=logging.INFO)
 
 def initialize_session_states():
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
-
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
-
     if "processComplete" not in st.session_state:
         st.session_state.processComplete = False
-        
     if 'messages' not in st.session_state:
         st.session_state['messages'] = [
             {"role": "assistant", "content": "안녕하세요! 주어진 문서에 대해 궁금하신 것이 있으면 언제든 물어봐주세요!"}
         ]
 
 def main():
-    st.set_page_config(page_title="Rag Chat bot", page_icon=":file:")
-    st.title("_File Retriever Based:red[QA Chat]_ :file:")
+    st.set_page_config(page_title="RAG Chat Bot", page_icon=":file:")
+    st.title("_File Retriever Based_ :red[QA Chat]_ :file:")
 
     initialize_session_states()
 
@@ -83,35 +80,37 @@ def process_query(query):
     with st.spinner("Thinking..."):
         result = st.session_state.conversation({"question": query})
         response = result['answer']
-        source_documents = result['source_documents']
+        sources = result.get('source_documents', [])
 
         st.session_state.messages.append({"role": "assistant", "content": response})
-        display_source_documents(source_documents)
+        display_source_documents(sources)
 
 def display_source_documents(source_documents):
     with st.expander("참고 문서 확인"):
         for doc in source_documents:
-            st.markdown(f"- {doc.metadata['source']}: {doc.page_content}")
+            st.markdown(f"- **{doc.metadata.get('source','')}**: {doc.page_content}")
 
 import os
 def get_text(docs):
     doc_list = []
     for doc in docs:
         file_name = doc.name
-        file_content = doc.getvalue()
-        temp_file_path = save_file(file_name, file_content)
-        loader = select_document_loader(file_name, temp_file_path)
+        content = doc.getvalue()
+        temp_path = save_file(file_name, content)
+
+        loader = select_document_loader(file_name, temp_path)
         if loader:
             documents = loader.load_and_split()
             doc_list.extend(documents)
-        os.remove(temp_file_path)
+
+        os.remove(temp_path)
     return doc_list
 
 def save_file(file_name, file_content):
     mode = 'wb' if not file_name.lower().endswith('.txt') else 'w'
-    content = file_content if mode=='wb' else file_content.decode('utf-8')
+    data = file_content if mode=='wb' else file_content.decode('utf-8')
     with open(file_name, mode) as f:
-        f.write(content)
+        f.write(data)
     return file_name
 
 def select_document_loader(file_name, file_path):
@@ -119,7 +118,7 @@ def select_document_loader(file_name, file_path):
     if ext == 'pdf':
         return PyPDFLoader(file_path)
     elif ext == 'docx':
-        return Docx2txtLoader(file_path)
+        return UnstructuredWordDocumentLoader(file_path)
     elif ext == 'pptx':
         return UnstructuredPowerPointLoader(file_path)
     elif ext == 'txt':
@@ -128,21 +127,21 @@ def select_document_loader(file_name, file_path):
         logger.error(f"Unsupported file type: {file_name}")
         return None
 
-def get_text_chunks(text_docs):
+def get_text_chunks(docs):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=900,
         chunk_overlap=100,
         length_function=len
     )
-    return splitter.split_documents(text_docs)
+    return splitter.split_documents(docs)
 
-def get_vector_store(text_chunks):
+def get_vector_store(chunks):
     embeddings = HuggingFaceEmbeddings(
         model_name="jhgan/ko-sroberta-multitask",
         model_kwargs={'device': 'cpu'},
         encode_kwargs={'normalize_embeddings': True},
     )
-    return FAISS.from_documents(text_chunks, embeddings)
+    return FAISS.from_documents(chunks, embeddings)
 
 def get_conversation_chain(vector_store, openai_api_key):
     llm = ChatOpenAI(
@@ -153,10 +152,7 @@ def get_conversation_chain(vector_store, openai_api_key):
     return ConversationalRetrievalChain.from_llm(
         llm=llm,
         chain_type="stuff",
-        retriever=vector_store.as_retriever(
-            search_type='mmr',
-            verbose=True
-        ),
+        retriever=vector_store.as_retriever(search_type='mmr', verbose=True),
         memory=ConversationBufferMemory(
             memory_key='chat_history',
             return_messages=True,
